@@ -6,16 +6,6 @@ import random
 # Configuración de la página en modo ancho
 st.set_page_config(page_title="Aplicación que aplica distintos filtros de Dithering", layout="wide")
 
-
-def remove_watermark(original_image):
-    """
-    Función para quitar la marca de agua de la imagen.
-    Aún no se implementa la lógica, por lo que se devuelve la imagen original.
-    """
-    # Aquí irá la lógica para quitar la marca de agua
-    return original_image
-
-
 def random_dithering(image):
     """
     Aplica el filtro de dithering por azar (random dithering).
@@ -381,7 +371,7 @@ def main():
     # Uploader de imagen
     uploaded_file = st.sidebar.file_uploader("Sube una imagen", type=["jpg", "jpeg", "png"])
 
-    st.title("Aplicación para Quitar Marca de Agua de Imágenes (con Filtros de Dithering)")
+    st.title("Aplicación que aplica distintos filtros de Dithering")
 
     if uploaded_file is not None:
         # Cargar la imagen y convertirla a RGB (en caso de que tenga canal alfa)
@@ -394,11 +384,8 @@ def main():
             st.image(original_image, caption="Imagen Original", use_container_width=True)
 
         with col2:
-            # Quitar marca de agua (lógica pendiente)
-            watermark_removed_image = remove_watermark(original_image)
-
             # Aplicar el filtro de dithering seleccionado
-            result_image = apply_dithering_filter(watermark_removed_image, dithering_filter)
+            result_image = apply_dithering_filter(dithering_filter)
 
             st.image(result_image, caption=f"Imagen con Filtro: {dithering_filter}", use_container_width=True)
 
