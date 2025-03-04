@@ -45,6 +45,228 @@ def random_dithering(image):
     return dithered_img.convert("RGB")
 
 
+def ordered_clustered_dithering(image):
+    """
+    Aplica el dithering ordenado y disperso (Clustered) usando una matriz de Bayer 4x4.
+    """
+    # 1) Convertir la imagen a escala de grises
+    gray_img = image.convert("L")
+
+    # 2) Definir la matriz de Bayer 4x4
+    bayer_4x4 = [
+        [ 0,  8,  2, 10],
+        [12,  4, 14,  6],
+        [ 3, 11,  1,  9],
+        [15,  7, 13,  5]
+    ]
+    # Nota: Esta matriz contiene valores de 0 a 15.
+
+    # 3) Crear una nueva imagen en 'L' para la salida
+    width, height = gray_img.size
+    dithered_img = Image.new("L", (width, height))
+
+    # Cargar los píxeles de ambas imágenes
+    src_pixels = gray_img.load()
+    dst_pixels = dithered_img.load()
+
+    # 4) Recorrer cada píxel y aplicar la comparación con la matriz Bayer
+    for y in range(height):
+        for x in range(width):
+            gray_val = src_pixels[x, y]  # Valor de 0..255
+            # Obtener el valor de la matriz Bayer en función de la posición (x, y)
+            bayer_value = bayer_4x4[y % 4][x % 4]  # Valor de 0..15
+            # Escalar el valor Bayer a 0..255
+            threshold = (bayer_value / 16) * 255
+
+            # Comparar con el valor de gris
+            if gray_val > threshold:
+                dst_pixels[x, y] = 255  # Blanco
+            else:
+                dst_pixels[x, y] = 0    # Negro
+
+    # 5) Convertir a RGB para mantener la misma consistencia de color
+    return dithered_img.convert("RGB")
+
+
+def dispersed_dithering_2x2(image):
+    """
+    Dithering disperso usando una matriz de Bayer 2×2.
+    """
+    # Convertir a escala de grises
+    gray_img = image.convert("L")
+    width, height = gray_img.size
+
+    # Matriz de Bayer 2×2 (dispersa)
+    # Niveles de 0..3 (4 niveles)
+    bayer_2x2 = [
+        [0, 2],
+        [3, 1]
+    ]
+
+    # Crear imagen de salida en modo 'L'
+    dithered_img = Image.new("L", (width, height))
+    src_pixels = gray_img.load()
+    dst_pixels = dithered_img.load()
+
+    for y in range(height):
+        for x in range(width):
+            gray_val = src_pixels[x, y]  # 0..255
+            # Obtener el valor de la matriz (0..3)
+            bayer_val = bayer_2x2[y % 2][x % 2]
+            # Escalar a rango [0..255]
+            # En 2×2, los valores van de 0..3, así que dividimos entre 4
+            threshold = (bayer_val / 4) * 255
+
+            if gray_val > threshold:
+                dst_pixels[x, y] = 255  # Blanco
+            else:
+                dst_pixels[x, y] = 0    # Negro
+
+    return dithered_img.convert("RGB")
+
+
+def dispersed_dithering_4x4(image):
+    """
+    Dithering disperso usando una matriz de Bayer 4×4.
+    """
+    # Convertir a escala de grises
+    gray_img = image.convert("L")
+    width, height = gray_img.size
+
+    # Matriz de Bayer 4×4 “dispersa” (versión clásica)
+    # Niveles de 0..15 (16 niveles)
+    bayer_4x4 = [
+        [ 0,  8,  2, 10],
+        [12,  4, 14,  6],
+        [ 3, 11,  1,  9],
+        [15,  7, 13,  5]
+    ]
+
+    # Crear imagen de salida en modo 'L'
+    dithered_img = Image.new("L", (width, height))
+    src_pixels = gray_img.load()
+    dst_pixels = dithered_img.load()
+
+    for y in range(height):
+        for x in range(width):
+            gray_val = src_pixels[x, y]  # 0..255
+            # Obtener el valor de la matriz (0..15)
+            bayer_val = bayer_4x4[y % 4][x % 4]
+            # Escalar a rango [0..255]
+            # En 4×4, los valores van de 0..15, así que dividimos entre 16
+            threshold = (bayer_val / 16) * 255
+
+            if gray_val > threshold:
+                dst_pixels[x, y] = 255  # Blanco
+            else:
+                dst_pixels[x, y] = 0    # Negro
+
+    return dithered_img.convert("RGB")
+
+
+def floyd_steinberg_dithering(image):
+    """
+    Aplica dithering Floyd Steinberg a la imagen.
+    Recorre cada píxel, decide blanco/negro y reparte el error a sus vecinos.
+    """
+    # 1) Convertir la imagen a escala de grises
+    gray_img = image.convert("L")
+    width, height = gray_img.size
+
+    # Cargar pixeles en memoria
+    pixels = gray_img.load()
+
+    # Función para asegurar que el valor queda en [0..255]
+    def clamp(val):
+        return max(0, min(255, int(val)))
+
+    # 2) Recorrer de arriba a abajo, izquierda a derecha
+    for y in range(height):
+        for x in range(width):
+            old_val = pixels[x, y]
+
+            # 3) Determinar nuevo valor (blanco o negro).
+            #    Por simplicidad, usamos 128 como umbral.
+            new_val = 255 if old_val >= 128 else 0
+            pixels[x, y] = new_val
+
+            # 4) Calcular error
+            error = old_val - new_val  # diferencia entre pixel original y 'forzado'
+
+            # 5) Distribuir el error a los píxeles vecinos (si existen) siguiendo
+            #    la clásica matriz de Floyd Steinberg:
+            #
+            #        (x+1, y)   += error * 7/16
+            #        (x-1, y+1) += error * 3/16
+            #        (x,   y+1) += error * 5/16
+            #        (x+1, y+1) += error * 1/16
+            #
+            #    Verificamos que estén dentro de los límites de la imagen.
+
+            # píxel derecho
+            if x + 1 < width:
+                pixels[x + 1, y] = clamp(pixels[x + 1, y] + error * (7 / 16))
+
+            # píxel abajo izquierda
+            if x - 1 >= 0 and y + 1 < height:
+                pixels[x - 1, y + 1] = clamp(pixels[x - 1, y + 1] + error * (3 / 16))
+
+            # píxel abajo
+            if y + 1 < height:
+                pixels[x, y + 1] = clamp(pixels[x, y + 1] + error * (5 / 16))
+
+            # píxel abajo derecha
+            if x + 1 < width and y + 1 < height:
+                pixels[x + 1, y + 1] = clamp(pixels[x + 1, y + 1] + error * (1 / 16))
+
+    # Convertir a RGB para mantener el mismo modo de color que otras funciones
+    return gray_img.convert("RGB")
+
+
+def fake_floyd_steinberg_dithering(image):
+    """
+    Aplica dithering Fake Floyd Steinberg, una versión simplificada de Floyd Steinberg,
+    donde el error solo se reparte a menos vecinos (por ejemplo, derecha y abajo).
+    """
+    # 1) Convertir la imagen a escala de grises
+    gray_img = image.convert("L")
+    width, height = gray_img.size
+
+    # Cargar pixeles en memoria
+    pixels = gray_img.load()
+
+    # Función para asegurar que el valor queda en [0..255]
+    def clamp(val):
+        return max(0, min(255, int(val)))
+
+    # 2) Recorrer la imagen de arriba a abajo, izquierda a derecha
+    for y in range(height):
+        for x in range(width):
+            old_val = pixels[x, y]
+
+            # 3) Determinar nuevo valor (blanco o negro)
+            new_val = 255 if old_val >= 128 else 0
+            pixels[x, y] = new_val
+
+            # 4) Calcular error
+            error = old_val - new_val
+
+            # 5) Distribuir el error a MENOS vecinos que Floyd Steinberg estándar.
+            #    Ejemplo sencillo: la mitad del error al píxel de la derecha,
+            #    y la otra mitad al píxel de abajo, si existen.
+
+            # píxel a la derecha
+            if x + 1 < width:
+                pixels[x + 1, y] = clamp(pixels[x + 1, y] + error * 0.5)
+
+            # píxel abajo
+            if y + 1 < height:
+                pixels[x, y + 1] = clamp(pixels[x, y + 1] + error * 0.5)
+
+    # Convertir a RGB para mantener consistencia con el resto de la app
+    return gray_img.convert("RGB")
+
+
 def apply_dithering_filter(image, filter_type):
     """
     Aplica el filtro de dithering seleccionado.
@@ -53,20 +275,27 @@ def apply_dithering_filter(image, filter_type):
         return random_dithering(image)
 
     elif filter_type == "2. Ordenado y disperso (Clustered)":
-        # TODO: Implementar dithering ordenado (clustered)
-        return image
+        return ordered_clustered_dithering(image)
+
 
     elif filter_type == "3. Disperso 2x2, 4x4":
-        # TODO: Implementar dithering disperso 2x2 y 4x4
-        return image
+        # Aquí podemos preguntar al usuario (o decidir por defecto)
+        # si aplicamos el 2x2 o el 4x4.
+        # Por ejemplo, un sub-menú en Streamlit:
+        sub_option = st.sidebar.selectbox(
+            "Selecciona el tamaño de la matriz dispersa:",
+            ("2x2", "4x4")
+        )
+        if sub_option == "2x2":
+            return dispersed_dithering_2x2(image)
+        else:
+            return dispersed_dithering_4x4(image)
 
     elif filter_type == "4. Floyd Steinberg":
-        # TODO: Implementar dithering Floyd Steinberg
-        return image
+        return floyd_steinberg_dithering(image)
 
     elif filter_type == "5. Fake Floyd Steinberg":
-        # TODO: Implementar dithering Fake Floyd Steinberg
-        return image
+        return fake_floyd_steinberg_dithering(image)
 
     elif filter_type == "6. Jarvis, Judice, Ninken":
         # TODO: Implementar dithering Jarvis, Judice, Ninken
