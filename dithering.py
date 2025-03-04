@@ -267,6 +267,63 @@ def fake_floyd_steinberg_dithering(image):
     return gray_img.convert("RGB")
 
 
+def jarvis_judice_ninke_dithering(image):
+    """
+    Aplica dithering Jarvis, Judice, y Ninke (JJN).
+    Reparte el error a un conjunto mayor de vecinos que Floyd Steinberg,
+    obteniendo un tramado más fino.
+    """
+    # 1) Convertir la imagen a escala de grises
+    gray_img = image.convert("L")
+    width, height = gray_img.size
+
+    # Cargar pixeles en memoria
+    pixels = gray_img.load()
+
+    # Función para asegurar que el valor queda en [0..255]
+    def clamp(val):
+        return max(0, min(255, int(val)))
+
+    # 2) Definir la distribución de error para JJN
+    #    Cada tupla: (desplazamiento_x, desplazamiento_y, factor)
+    #    Referencia típica del patrón:
+    #    (x+1,  y)   = 7/48,  (x+2,  y)   = 5/48
+    #    (x-2,  y+1) = 3/48,  (x-1,  y+1) = 5/48, (x, y+1) = 7/48, (x+1, y+1) = 5/48, (x+2, y+1) = 3/48
+    #    (x-2,  y+2) = 1/48,  (x-1,  y+2) = 3/48, (x, y+2) = 5/48, (x+1, y+2) = 3/48, (x+2, y+2) = 1/48
+
+    diffusion_map = [
+        (1, 0, 7 / 48), (2, 0, 5 / 48),
+        (-2, 1, 3 / 48), (-1, 1, 5 / 48), (0, 1, 7 / 48), (1, 1, 5 / 48), (2, 1, 3 / 48),
+        (-2, 2, 1 / 48), (-1, 2, 3 / 48), (0, 2, 5 / 48), (1, 2, 3 / 48), (2, 2, 1 / 48)
+    ]
+
+    # 3) Recorrer la imagen de arriba a abajo, izquierda a derecha
+    for y in range(height):
+        for x in range(width):
+            old_val = pixels[x, y]
+
+            # 4) Redondear (decidir blanco o negro).
+            #    Usamos 128 como umbral, pero puedes ajustar.
+            new_val = 255 if old_val >= 128 else 0
+            pixels[x, y] = new_val
+
+            # 5) Calcular error
+            error = old_val - new_val
+
+            # 6) Repartir el error entre los vecinos que aún no han sido procesados
+            for dx, dy, factor in diffusion_map:
+                nx = x + dx
+                ny = y + dy
+                # Verifica que (nx, ny) esté dentro de la imagen
+                if 0 <= nx < width and 0 <= ny < height:
+                    current_val = pixels[nx, ny]
+                    # Sumar el error con su factor
+                    pixels[nx, ny] = clamp(current_val + error * factor)
+
+    # 7) Convertir de nuevo a RGB para mantener consistencia en la salida
+    return gray_img.convert("RGB")
+
+
 def apply_dithering_filter(image, filter_type):
     """
     Aplica el filtro de dithering seleccionado.
@@ -298,8 +355,8 @@ def apply_dithering_filter(image, filter_type):
         return fake_floyd_steinberg_dithering(image)
 
     elif filter_type == "6. Jarvis, Judice, Ninken":
-        # TODO: Implementar dithering Jarvis, Judice, Ninken
-        return image
+        return jarvis_judice_ninke_dithering(image)
+
 
     else:
         return image
