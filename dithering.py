@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 from io import BytesIO
+import random
 
 # Configuración de la página en modo ancho
 st.set_page_config(page_title="Aplicación Quita Marca de Agua", layout="wide")
@@ -15,15 +16,41 @@ def remove_watermark(original_image):
     return original_image
 
 
+def random_dithering(image):
+    """
+    Aplica el filtro de dithering por azar (random dithering).
+    """
+    # 1. Convertir la imagen a escala de grises
+    gray_img = image.convert("L")
+
+    # Crear una nueva imagen en 'L' para la salida
+    width, height = gray_img.size
+    dithered_img = Image.new("L", (width, height))
+
+    # Cargar los pixeles
+    src_pixels = gray_img.load()
+    dst_pixels = dithered_img.load()
+
+    # 2. Recorrer cada píxel y asignar blanco/negro según número aleatorio
+    for y in range(height):
+        for x in range(width):
+            gray_val = src_pixels[x, y]
+            rand_val = random.randint(0, 255)
+            if gray_val > rand_val:
+                dst_pixels[x, y] = 255  # Blanco
+            else:
+                dst_pixels[x, y] = 0  # Negro
+
+    # 3. Convertir a RGB para guardar en la misma línea de color que la original
+    return dithered_img.convert("RGB")
+
+
 def apply_dithering_filter(image, filter_type):
     """
     Aplica el filtro de dithering seleccionado.
-    Por ahora, cada filtro devuelve la imagen sin modificaciones.
-    La lógica de cada dithering se implementará en pasos posteriores.
     """
     if filter_type == "1. Filtro de Azar":
-        # TODO: Implementar dithering por azar
-        return image
+        return random_dithering(image)
 
     elif filter_type == "2. Ordenado y disperso (Clustered)":
         # TODO: Implementar dithering ordenado (clustered)
@@ -46,7 +73,6 @@ def apply_dithering_filter(image, filter_type):
         return image
 
     else:
-        # Si no se selecciona, simplemente regresamos la imagen original
         return image
 
 
@@ -82,10 +108,10 @@ def main():
             st.image(original_image, caption="Imagen Original", use_container_width=True)
 
         with col2:
-            # Quitar marca de agua (lógica pendiente o en desarrollo)
+            # Quitar marca de agua (lógica pendiente)
             watermark_removed_image = remove_watermark(original_image)
 
-            # Aplicar el filtro de dithering seleccionado (lógica pendiente en cada filtro)
+            # Aplicar el filtro de dithering seleccionado
             result_image = apply_dithering_filter(watermark_removed_image, dithering_filter)
 
             st.image(result_image, caption=f"Imagen con Filtro: {dithering_filter}", use_container_width=True)
