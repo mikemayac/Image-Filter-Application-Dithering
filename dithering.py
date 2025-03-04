@@ -4,7 +4,7 @@ from io import BytesIO
 import random
 
 # Configuración de la página en modo ancho
-st.set_page_config(page_title="Aplicación Quita Marca de Agua", layout="wide")
+st.set_page_config(page_title="Aplicación que aplica distintos filtros de Dithering", layout="wide")
 
 
 def remove_watermark(original_image):
