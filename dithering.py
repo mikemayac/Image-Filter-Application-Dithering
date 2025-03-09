@@ -385,7 +385,7 @@ def main():
 
         with col2:
             # Aplicar el filtro de dithering seleccionado
-            result_image = apply_dithering_filter(dithering_filter)
+            result_image = apply_dithering_filter(original_image, dithering_filter)
 
             st.image(result_image, caption=f"Imagen con Filtro: {dithering_filter}", use_container_width=True)
 
